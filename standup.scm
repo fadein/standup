@@ -14,7 +14,7 @@
 	  (print "TERM=" (get-environment-variable "TERM")))))
 
 (define (sitdown)
-  (bell&title "sit down!")
+  (bell&title "sit down")
   (let loop ((timer *major*) (state #t))
 	(sleep 1)
 	(cond
@@ -24,7 +24,7 @@
 	   (loop *minor* #f))
 
 	  ((and (zero? timer) (not state))
-	   (bell&title "sit down!")
+	   (bell&title "sit down")
 	   (loop *major* #t))
 
 	  ((zero? (remainder timer 10))
