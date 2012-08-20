@@ -1,4 +1,4 @@
-Requires the regex-case egg.
+Requires the regex-case and stty eggs.
 
 Currently is a crappy console program that rings the terminal bell
 to highlight the terminal's icon in the taskbar.  Eventually I'd
