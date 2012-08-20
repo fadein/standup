@@ -1,6 +1,6 @@
-#!/var/lib/bin/csi -s
+#!/var/lib/bin/csi -ns
 (use regex-case)
-(use posix)
+(use stty)
 
 (define *major* (* 60 20))
 (define *minor* (* 60 2))
@@ -51,8 +51,6 @@
 
 	  (else (loop (sub1 timer) state paused)))))
 
-(set-buffering-mode! (current-input-port) #:none)
-
-(sitdown)
+(with-stty '(not icanon) sitdown)
 
 ; vim:set ft=scheme:
