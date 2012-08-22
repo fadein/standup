@@ -1,5 +1,6 @@
 #!/var/lib/bin/csi -ns
 (use regex-case)
+(use srfi-13)
 (use srfi-18)
 (use stty)
 
@@ -16,6 +17,22 @@
 			   (printf "~a~n]0;~a~!" str str))
 			  (else
 				(print "TERM=" (get-environment-variable "TERM")))))
+
+
+(define (prettySeconds s)
+  (let* ((hours   (inexact->exact (truncate (/ s 60 60))))
+		 (hours_s (string-pad (number->string hours) 2 #\0))
+		 (minut_s (string-pad
+					(number->string
+					  (inexact->exact
+						(remainder (truncate (/ s 60)) 60))) 2 #\0))
+		 (secon_s (string-pad
+					(number->string
+					  (inexact->exact (remainder s 60))) 2 #\0)))
+	(if (zero? hours)
+	  (sprintf "~a:~a" minut_s secon_s)
+	  (sprintf "~a:~a:~a" hours_s minut_s secon_s))))
+
 
 (define (sitdown)
   (bell&title *sit*)
@@ -56,11 +73,12 @@
 	   (loop *sit-time* #t #t))
 
 	  ;print a periodic status msg to indicate where we are
-	  ;TODO: fix this up
-	  ((zero? (remainder (truncate timer) 10))
-	   (printf "~a...~n" timer)
-	   (loop (- timer *interval*) state paused))
+	  ((and-let* ((t (truncate timer))
+			  ((< (- timer t) *interval*)))
+		 (printf "~a...\r~!" (prettySeconds t)))
+		 (loop (- timer *interval*) state paused))
 
+	  ;otherwise, decrement timer
 	  (else (loop (- timer *interval*) state paused)))))
 
 (with-stty '(not icanon echo) sitdown)
