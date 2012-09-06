@@ -46,15 +46,21 @@
 	  ;handle input characters
 	  ((char-ready?)
 	   (let ((char (read-char)))
-		 (if (char=? #\space char)
-		   (cond
-			 (paused
-			   (bell&title (if state *sit* *stand*))
-			   (loop (- timer *interval*) state (not paused)))
-			 (else
-			   (bell&title "[PAUSED]")
-			   (loop (- timer *interval*) state (not paused))))
-		   (loop (- timer *interval*) state paused))))
+		 (case char
+		   ((#\space) ;pause/resume on SPACE
+			(cond
+			  (paused
+				(bell&title (if state *sit* *stand*))
+				(loop (- timer *interval*) state (not paused)))
+			  (else
+				(bell&title "[PAUSED]")
+				(loop (- timer *interval*) state (not paused)))))
+
+		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
+			(loop 0 state paused))
+
+		   (else
+			 (loop (- timer *interval*) state paused)))))
 
 	  ;timer is paused - NOOP
 	  (paused
