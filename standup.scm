@@ -37,6 +37,8 @@
 (define (sitdown)
   (bell&title *sit*)
 
+  ;state = #t means "sit"
+  ;state = #f means "stand"
   (let loop ((timer *sit-time*) (state #t) (paused #f))
 
 	(thread-sleep! *interval*)
@@ -58,6 +60,11 @@
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
 			(loop 0 state paused))
+
+		   ((#\R #\r) ;reset the timer on R or r
+			(loop
+			  (if state *sit-time* *stand-time*)
+			  state paused))
 
 		   (else
 			 (loop (- timer *interval*) state paused)))))
