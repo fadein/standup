@@ -71,6 +71,9 @@
 			  (if state *sit-time* *stand-time*)
 			  state paused))
 
+		   ((#\Q #\q) ;quit
+			(exit))
+
 		   (else
 			 (loop (- timer *interval*) state paused)))))
 
