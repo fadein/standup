@@ -4,8 +4,13 @@
 (use srfi-18)
 (use stty)
 
-(define *sit-time*   (* 60 20))
-(define *stand-time* (* 60 2))
+(define-syntax minutes
+  (syntax-rules ()
+	((_ n)
+	 (* 60 n))))
+
+(define *sit-time*   (minutes 30))
+(define *stand-time* (minutes 5))
 (define *interval*   0.125)
 
 (define *stand*      "stand up!")
