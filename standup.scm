@@ -34,7 +34,8 @@
 (define (bell&title str)
   (regex-case (get-environment-variable "TERM")
 			  ("screen.*|xterm.*|rxvt.*" _
-			   (printf "~a~n]0;~a~!" str (strip-ansi-colors str) ))
+			   (erase-line)
+			   (printf "~a]0;~a~!" str (strip-ansi-colors str) ))
 			  (else
 				(print "TERM=" (get-environment-variable "TERM")))))
 
@@ -187,6 +188,7 @@ POMO
 
 (define (sitdown)
   (bell&title (set-text '(bold fg-blue) *sit*))
+  (newline)
 
   ;state = #t means "sit"
   ;state = #f means "stand"
@@ -204,10 +206,12 @@ POMO
 		   ((#\space) ;pause/resume on SPACE
 			(cond
 			  (paused
-				(bell&title (set-text `(bold ,(car colors)) (if state *sit* *stand*)))
+				(erase-line)
+				(bell&title (set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r")))
 				(loop (- timer *interval*) state (not paused) colors))
 			  (else
-				(bell&title (set-text `(bold ,(car colors)) "[PAUSED]"))
+				(erase-line)
+				(bell&title (set-text (list (car colors)) "[PAUSED]\r"))
 				(loop (- timer *interval*) state (not paused) colors))))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
@@ -230,27 +234,30 @@ POMO
 
 	  ;transition from sitting to STANDING
 	  ((and (<= timer 0) state)
-	   (bell&title (set-text `(bold ,(car colors)) *stand*))
+	   (bell&title (set-text `(bold ,(car colors)) (conc *stand* "\r")))
+	   (newline)
 	   (cond
 		 ;; when we're at the end of our list of colors, the cycle is almost complete.
 		 ;; it's time for a big pomodoro break!!!
 		 ((eq? (car colors) *last-color*)
-		  (print (set-text `(bold ,(car colors)) (a-pomodoro)  "\nPress [space] to continue..."))
+		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
+		  (print (set-text (list (car colors)) "\nPress [space] to continue..."))
 		  (loop *sit-time* #f #t colors))
 		 (else
-		   (print (set-text `(bold ,(car colors)) "Press [space] to continue..."))
+		   (print (set-text (list (car colors)) "Press [space] to continue..."))
 		   (loop *stand-time* #f #t colors))))
 
 	  ;transition from STANDING to sitting
 	  ((and (<= timer 0) (not state))
-	   (bell&title (set-text `(bold ,(cadr colors)) *sit*))
-	   (print (set-text `(bold ,(cadr colors)) "Press [space] to continue..."))
+	   (bell&title (set-text `(bold ,(cadr colors)) (conc *sit* "\r")))
+	   (newline)
+	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
 	   (loop *sit-time* #t #t (cdr colors)))
 
 	  ;print a periodic status msg to indicate where we are
 	  ((and-let* ((t (truncate timer))
 			  ((< (- timer t) *interval*)))
-		 (printf "~a...\r~!" (set-text `(bold ,(car colors)) (prettySeconds t))))
+		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds t))))
 		 (loop (- timer *interval*) state paused colors))
 
 	  ;otherwise, decrement timer
