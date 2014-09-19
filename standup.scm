@@ -23,10 +23,18 @@
 (define *stand*      "stand up!")
 (define *sit*        "sit down")
 
+(define (strip-ansi-colors str)
+  (if (char=? #\escape (string-ref str 0))
+	(let* ((first (string-index str #\m))
+		   (end (string-index str #\escape first)))
+	  (substring str (add1 first) end))
+	str))
+
+
 (define (bell&title str)
   (regex-case (get-environment-variable "TERM")
 			  ("screen.*|xterm.*|rxvt.*" _
-			   (printf "~a~n]0;~a~!" str str))
+			   (printf "~a~n]0;~a~!" str (strip-ansi-colors str) ))
 			  (else
 				(print "TERM=" (get-environment-variable "TERM")))))
 
@@ -48,8 +56,19 @@
 
 ;; Big, sorta awkward group of Pomodoro banners
 
+
 (define a-pomodoro
-  (let ((texts (list
+
+  (let* ((vector-shuffle
+		   (lambda (v)
+			 (do ((n (vector-length v) (- n 1))) ((zero? n) v)
+			   (let* ((r (random n)) (t (vector-ref v r)))
+				 (vector-set! v r (vector-ref v (- n 1)))
+				 (vector-set! v (- n 1) t)))))
+		 (texts
+		  (vector->list
+			(vector-shuffle
+			  #(
 #<<POMO
  ____  ____  _      ____  ____  ____  ____  ____  _
 /  __\/  _ \/ \__/|/  _ \/  _ \/  _ \/  __\/  _ \/ \
@@ -155,15 +174,19 @@ POMO
 /_/   |_,'/_nn_/|_,'|__/ |_,'//  |_,'()
 POMO
 
-)))
+)))))
+
+; make this list circular
+(set-cdr! (last-pair texts) texts)
 (lambda ()
-	(list-ref texts (random (length texts))))))
+  (set! texts (cdr texts))
+	(car texts))))
 
 ; How to tell that we're at the end of the circular list
 (define *last-color* 'fg-red)
 
 (define (sitdown)
-  (bell&title *sit*)
+  (bell&title (set-text '(bold fg-blue) *sit*))
 
   ;state = #t means "sit"
   ;state = #f means "stand"
@@ -181,10 +204,10 @@ POMO
 		   ((#\space) ;pause/resume on SPACE
 			(cond
 			  (paused
-				(bell&title (if state *sit* *stand*))
+				(bell&title (set-text `(bold ,(car colors)) (if state *sit* *stand*)))
 				(loop (- timer *interval*) state (not paused) colors))
 			  (else
-				(bell&title "[PAUSED]")
+				(bell&title (set-text `(bold ,(car colors)) "[PAUSED]"))
 				(loop (- timer *interval*) state (not paused) colors))))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
@@ -207,22 +230,21 @@ POMO
 
 	  ;transition from sitting to STANDING
 	  ((and (<= timer 0) state)
-	   (bell&title *stand*)
+	   (bell&title (set-text `(bold ,(car colors)) *stand*))
 	   (cond
 		 ;; when we're at the end of our list of colors, the cycle is almost complete.
 		 ;; it's time for a big pomodoro break!!!
 		 ((eq? (car colors) *last-color*)
-		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
-		  (print "\nPress [space] to continue...")
+		  (print (set-text `(bold ,(car colors)) (a-pomodoro)  "\nPress [space] to continue..."))
 		  (loop *sit-time* #f #t colors))
 		 (else
-		   (print "Press [space] to continue...")
+		   (print (set-text `(bold ,(car colors)) "Press [space] to continue..."))
 		   (loop *stand-time* #f #t colors))))
 
 	  ;transition from STANDING to sitting
 	  ((and (<= timer 0) (not state))
-	   (bell&title *sit*)
-	   (print "Press [space] to continue...")
+	   (bell&title (set-text `(bold ,(cadr colors)) *sit*))
+	   (print (set-text `(bold ,(cadr colors)) "Press [space] to continue..."))
 	   (loop *sit-time* #t #t (cdr colors)))
 
 	  ;print a periodic status msg to indicate where we are
