@@ -223,7 +223,7 @@ POMO
 			  state paused colors))
 
 		   ((#\Q #\q) ;quit
-			(exit))
+			#f)
 
 		   (else
 			 (loop (- timer *interval*) state paused colors)))))
@@ -263,6 +263,8 @@ POMO
 	  ;otherwise, decrement timer
 	  (else (loop (- timer *interval*) state paused colors)))))
 
+(print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
+(print (show-cursor))
 
 ; vim:set ft=scheme:
