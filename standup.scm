@@ -263,31 +263,37 @@ POMO
   (set! texts (cdr texts))
 	(car texts))))
 
+(let ((grammar
+		`((standup-time
+			,(conc "Number of minutes for the standup interval (default " *stand-time* ")")
+			(value #t)
+			(single-char #\u))
+		  (sitdown-time
+			,(conc "Number of minutes for the sitdown interval (default " *sit-time* ")")
+			(value #t)
+			(single-char #\d))
+		  (help
+			"This usage message"
+			(single-char #\h)))))
 
-(letrec ((grammar
-		   `((standup-time
-			   ,(conc "Number of minutes for the standup interval (default " *stand-time* ")")
-			   (value #t)
-			   (single-char #\u))
-			 (sitdown-time
-			   ,(conc "Number of minutes for the sitdown interval (default " *sit-time* ")")
-			   (value #t)
-			   (single-char #\d))
-			 (help
-			   "This usage message"
-			   (single-char #\h))))
-		   (opts
-			 (getopt-long (command-line-arguments) grammar
-						  UNKNOWN-OPTION-HANDLER: (lambda (l) (usage grammar) ))))
+  (let ((opts (getopt-long (command-line-arguments) grammar
+						   unknown-option-handler:
+						   (lambda (l)
+							 (printf "Unrecognized argument~a ~a~n"
+									 (if (= 1 (length l)) "" "s")
+									 l)
+							 (print (usage grammar))
+							 (exit 7)))))
 
-  (when (assoc 'help opts)
-	(usage grammar)
-	(exit 1))
+	(when (assoc 'help opts)
+	  (print "standup usage:")
+	  (print (usage grammar))
+	  (exit 1))
 
-  (when (assoc 'standup-time opts)
-	(set! *stand-time* (* 60 (string->number (cdr (assoc 'standup-time opts))))))
-  (when (assoc 'sitdown-time opts)
-	(set! *sit-time* (* 60 (string->number (cdr (assoc 'sitdown-time opts)))))))
+	(when (assoc 'standup-time opts)
+	  (set! *stand-time* (* 60 (string->number (cdr (assoc 'standup-time opts))))))
+	(when (assoc 'sitdown-time opts)
+	  (set! *sit-time* (* 60 (string->number (cdr (assoc 'sitdown-time opts))))))))
 
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
