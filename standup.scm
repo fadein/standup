@@ -1,5 +1,7 @@
 #!/usr/bin/csi -ns
+
 (use ansi-escape-sequences)
+(use getopt-long)
 (use regex-case)
 (use srfi-1)
 (use srfi-13)
@@ -16,12 +18,15 @@
 	((_ n)
 	 (* 60 n))))
 
-(define *sit-time*   (minutes 25))
+(define *sit-time*   (minutes 60))
 (define *stand-time* (minutes 10))
 (define *interval*   0.125)
 
 (define *stand*      "stand up!")
 (define *sit*        "sit down")
+
+; How to tell that we're at the end of the circular list
+(define *last-color* 'fg-red)
 
 (define (strip-ansi-colors str)
   (if (char=? #\escape (string-ref str 0))
@@ -55,11 +60,86 @@
 	  (sprintf "~a:~a:~a" hours_s minut_s secon_s))))
 
 
+(define (sitdown)
+  (bell&title (set-text '(bold fg-blue) *sit*))
+  (newline)
+
+  ;state = #t means "sit"
+  ;state = #f means "stand"
+  (let loop ((timer *sit-time*) (state #t) (paused #f)
+								(colors (circular-list 'fg-blue 'fg-green 'fg-yellow *last-color*)))
+
+	(thread-sleep! *interval*)
+
+	(cond
+
+	  ;handle input characters
+	  ((char-ready?)
+	   (let ((char (read-char)))
+		 (case char
+		   ((#\space) ;pause/resume on SPACE
+			(cond
+			  (paused
+				(erase-line)
+				(bell&title (set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r")))
+				(loop (- timer *interval*) state (not paused) colors))
+			  (else
+				(erase-line)
+				(bell&title (set-text (list (car colors)) "[PAUSED]\r"))
+				(loop (- timer *interval*) state (not paused) colors))))
+
+		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
+			(loop 0 state paused colors))
+
+		   ((#\R #\r) ;reset the timer on R or r
+			(loop
+			  (if state *sit-time* *stand-time*)
+			  state paused colors))
+
+		   ((#\Q #\q) ;quit
+			#f)
+
+		   (else
+			 (loop (- timer *interval*) state paused colors)))))
+
+	  ;timer is paused - NOOP
+	  (paused
+		(loop timer state paused colors))
+
+	  ;transition from sitting to STANDING
+	  ((and (<= timer 0) state)
+	   (bell&title (set-text `(bold ,(car colors)) (conc *stand* "\r")))
+	   (newline)
+	   (cond
+		 ;; when we're at the end of our list of colors, the cycle is almost complete.
+		 ;; it's time for a big pomodoro break!!!
+		 ((eq? (car colors) *last-color*)
+		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
+		  (print (set-text (list (car colors)) "\nPress [space] to continue..."))
+		  (loop *sit-time* #f #t colors))
+		 (else
+		   (print (set-text (list (car colors)) "Press [space] to continue..."))
+		   (loop *stand-time* #f #t colors))))
+
+	  ;transition from STANDING to sitting
+	  ((and (<= timer 0) (not state))
+	   (bell&title (set-text `(bold ,(cadr colors)) (conc *sit* "\r")))
+	   (newline)
+	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
+	   (loop *sit-time* #t #t (cdr colors)))
+
+	  ;print a periodic status msg to indicate where we are
+	  ((and-let* ((t (truncate timer))
+			  ((< (- timer t) *interval*)))
+		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds t))))
+		 (loop (- timer *interval*) state paused colors))
+
+	  ;otherwise, decrement timer
+	  (else (loop (- timer *interval*) state paused colors)))))
+
+
 ;; Big, sorta awkward group of Pomodoro banners
-
-
 (define a-pomodoro
-
   (let* ((vector-shuffle
 		   (lambda (v)
 			 (do ((n (vector-length v) (- n 1))) ((zero? n) v)
@@ -183,85 +263,31 @@ POMO
   (set! texts (cdr texts))
 	(car texts))))
 
-; How to tell that we're at the end of the circular list
-(define *last-color* 'fg-red)
 
-(define (sitdown)
-  (bell&title (set-text '(bold fg-blue) *sit*))
-  (newline)
+(letrec ((grammar
+		   `((standup-time
+			   ,(conc "Number of minutes for the standup interval (default " *stand-time* ")")
+			   (value #t)
+			   (single-char #\u))
+			 (sitdown-time
+			   ,(conc "Number of minutes for the sitdown interval (default " *sit-time* ")")
+			   (value #t)
+			   (single-char #\d))
+			 (help
+			   "This usage message"
+			   (single-char #\h))))
+		   (opts
+			 (getopt-long (command-line-arguments) grammar
+						  UNKNOWN-OPTION-HANDLER: (lambda (l) (usage grammar) ))))
 
-  ;state = #t means "sit"
-  ;state = #f means "stand"
-  (let loop ((timer *sit-time*) (state #t) (paused #f)
-								(colors (circular-list 'fg-blue 'fg-green 'fg-yellow *last-color*)))
+  (when (assoc 'help opts)
+	(usage grammar)
+	(exit 1))
 
-	(thread-sleep! *interval*)
-
-	(cond
-
-	  ;handle input characters
-	  ((char-ready?)
-	   (let ((char (read-char)))
-		 (case char
-		   ((#\space) ;pause/resume on SPACE
-			(cond
-			  (paused
-				(erase-line)
-				(bell&title (set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r")))
-				(loop (- timer *interval*) state (not paused) colors))
-			  (else
-				(erase-line)
-				(bell&title (set-text (list (car colors)) "[PAUSED]\r"))
-				(loop (- timer *interval*) state (not paused) colors))))
-
-		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
-			(loop 0 state paused colors))
-
-		   ((#\R #\r) ;reset the timer on R or r
-			(loop
-			  (if state *sit-time* *stand-time*)
-			  state paused colors))
-
-		   ((#\Q #\q) ;quit
-			#f)
-
-		   (else
-			 (loop (- timer *interval*) state paused colors)))))
-
-	  ;timer is paused - NOOP
-	  (paused
-		(loop timer state paused colors))
-
-	  ;transition from sitting to STANDING
-	  ((and (<= timer 0) state)
-	   (bell&title (set-text `(bold ,(car colors)) (conc *stand* "\r")))
-	   (newline)
-	   (cond
-		 ;; when we're at the end of our list of colors, the cycle is almost complete.
-		 ;; it's time for a big pomodoro break!!!
-		 ((eq? (car colors) *last-color*)
-		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
-		  (print (set-text (list (car colors)) "\nPress [space] to continue..."))
-		  (loop *sit-time* #f #t colors))
-		 (else
-		   (print (set-text (list (car colors)) "Press [space] to continue..."))
-		   (loop *stand-time* #f #t colors))))
-
-	  ;transition from STANDING to sitting
-	  ((and (<= timer 0) (not state))
-	   (bell&title (set-text `(bold ,(cadr colors)) (conc *sit* "\r")))
-	   (newline)
-	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
-	   (loop *sit-time* #t #t (cdr colors)))
-
-	  ;print a periodic status msg to indicate where we are
-	  ((and-let* ((t (truncate timer))
-			  ((< (- timer t) *interval*)))
-		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds t))))
-		 (loop (- timer *interval*) state paused colors))
-
-	  ;otherwise, decrement timer
-	  (else (loop (- timer *interval*) state paused colors)))))
+  (when (assoc 'standup-time opts)
+	(set! *stand-time* (* 60 (string->number (cdr (assoc 'standup-time opts))))))
+  (when (assoc 'sitdown-time opts)
+	(set! *sit-time* (* 60 (string->number (cdr (assoc 'sitdown-time opts)))))))
 
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
