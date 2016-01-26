@@ -273,11 +273,11 @@ POMO
 
 (let ((grammar
 		`((standup-time
-			,(conc "Number of minutes for the standup interval (default " *stand-time* ")")
+			,(conc "Number of minutes for the standup interval (default " (/ *stand-time* 60) ")")
 			(value #t)
 			(single-char #\u))
 		  (sitdown-time
-			,(conc "Number of minutes for the sitdown interval (default " *sit-time* ")")
+			,(conc "Number of minutes for the sitdown interval (default " (/ *sit-time* 60) ")")
 			(value #t)
 			(single-char #\d))
 		  (help
