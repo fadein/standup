@@ -8,6 +8,14 @@
 (use srfi-18)
 (use stty)
 
+(define (cleanup signal)
+  (print (show-cursor) (set-text '(fg-white) ""))
+  (exit))
+(set-signal-handler! signal/term  cleanup)
+(set-signal-handler! signal/int   cleanup)
+(set-signal-handler! signal/pipe  cleanup)
+(set-signal-handler! signal/quit  cleanup)
+
 (define-syntax seconds
   (syntax-rules ()
 	((_ n)
