@@ -102,6 +102,17 @@
 		   ((#\Q #\q) ;quit
 			#f)
 
+		   ((#\H #\h #\?) ;help
+			(erase-line)
+			(print (string-join '("Pomodoro timer usage:"
+								  "\tH,h,?\tThis usage message"
+								  "\tSPACE\tPause/Resume"
+								  "\t0,Z,z\tZero the timer"
+								  "\tR,r\tReset timer"
+								  "\tQ,q\tQuit")
+								"\n"))
+			(loop (- timer *interval*) state paused colors))
+
 		   (else
 			 (loop (- timer *interval*) state paused colors)))))
 
