@@ -1,12 +1,12 @@
 #!/usr/bin/csi -ns
 
-(use ansi-escape-sequences)
-(use getopt-long)
-(use regex-case)
-(use srfi-1)
-(use srfi-13)
-(use srfi-18)
-(use stty)
+(use ansi-escape-sequences
+	 getopt-long
+	 regex-case
+	 srfi-1
+	 srfi-13
+	 srfi-18
+	 stty)
 
 (define (cleanup signal)
   (print (show-cursor) (set-text '(fg-white) ""))
@@ -37,18 +37,21 @@
 (define *last-color* 'fg-red)
 
 (define (strip-ansi-colors str)
-  (if (char=? #\escape (string-ref str 0))
-	(let* ((first (string-index str #\m))
-		   (end (string-index str #\escape first)))
-	  (substring str (add1 first) end))
-	str))
+  (string-delete char-set:iso-control
+				 (if (char=? #\escape (string-ref str 0))
+				   (let* ((first (string-index str #\m))
+						  (end (string-index str #\escape first)))
+					 (substring str (add1 first) end))
+				   str)))
 
 
 (define (bell&title str)
   (regex-case (get-environment-variable "TERM")
 			  ("screen.*|xterm.*|rxvt.*" _
 			   (erase-line)
-			   (printf "~a]0;~a~!" str (strip-ansi-colors str) ))
+			   ; http://www.tldp.org/HOWTO/Xterm-Title-3.html#ss3.1
+			   ; ~! tells CHICKEN's printf function to flush its output
+			   (printf "~a\033]0;~a\007\007~!" str (strip-ansi-colors str) ))
 			  (else
 				(print "TERM=" (get-environment-variable "TERM")))))
 
@@ -106,6 +109,17 @@
 
 		   ((#\Q #\q) ;quit
 			#f)
+
+		   ((#\H #\h #\?) ;help
+			(erase-line)
+			(print (string-join '("Pomodoro timer usage:"
+								  "\tH,h,?\tThis usage message"
+								  "\tSPACE\tPause/Resume"
+								  "\t0,Z,z\tZero the timer"
+								  "\tR,r\tReset timer"
+								  "\tQ,q\tQuit")
+								"\n"))
+			(loop (- timer *interval*) state paused colors))
 
 		   (else
 			 (loop (- timer *interval*) state paused colors)))))
