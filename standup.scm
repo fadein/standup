@@ -44,7 +44,8 @@
 					 (substring str (add1 first) end))
 				   str)))
 
-
+;; ring the terminal bell, update the XTerm title, and update the bottom line of the terminal's text
+;; this function is doing too much
 (define (bell&title str)
   (regex-case (get-environment-variable "TERM")
 			  ("screen.*|xterm.*|rxvt.*" _
@@ -56,20 +57,22 @@
 				(print "TERM=" (get-environment-variable "TERM")))))
 
 
-(define (prettySeconds s)
-  (let* ((hours   (inexact->exact (truncate (/ s 60 60))))
-		 (hours_s (string-pad (number->string hours) 2 #\0))
-		 (minut_s (string-pad
-					(number->string
-					  (inexact->exact
-						(remainder (truncate (/ s 60)) 60))) 2 #\0))
-		 (secon_s (string-pad
-					(number->string
-					  (inexact->exact (remainder s 60))) 2 #\0)))
-	(if (zero? hours)
-	  (sprintf "~a:~a" minut_s secon_s)
+;; pretty-print '(hours minutes seconds)  into hours:minutes:seconds
+(define (prettySeconds hms)
+  (let
+	((hours_s (string-pad (number->string (car   hms)) 2 #\0))
+	 (minut_s (string-pad (number->string (cadr  hms)) 2 #\0))
+	 (secon_s (string-pad (number->string (caddr hms)) 2 #\0)))
+	(if (zero? (car hms))
+	  (sprintf "~a:~a"            minut_s secon_s)
 	  (sprintf "~a:~a:~a" hours_s minut_s secon_s))))
 
+;; what I need instead is a function which can split time into the components
+(define (seconds->hms s)
+  (let ((hours   (inexact->exact (truncate (/ s 60 60))))
+		(minutes (inexact->exact (remainder (truncate (/ s 60)) 60)))
+		(seconds (inexact->exact (remainder s 60))))
+	(list hours minutes seconds)))
 
 (define (sitdown)
   (bell&title (set-text '(bold fg-blue) *sit*))
@@ -147,10 +150,13 @@
 	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
 	   (loop *sit-time* #t #t (cdr colors)))
 
-	  ;print a periodic status msg to indicate where we are
+	  ;update time display once per second
 	  ((and-let* ((t (truncate timer))
-			  ((< (- timer t) *interval*)))
-		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds t))))
+			  ((< (- timer t) *interval*))
+			  (hms (seconds->hms t)))
+		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
+		 (when (= (caddr hms) 59)
+		   (printf "\033]0;~a ~am\007\007~!" (if state *sit* *stand*) (cadr hms))))
 		 (loop (- timer *interval*) state paused colors))
 
 	  ;otherwise, decrement timer
