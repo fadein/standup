@@ -157,12 +157,17 @@
 
 	  ;update time display once per second
 	  ((and-let* ((t (truncate timer))
-			  ((< (- timer t) *interval*))
-			  (hms (seconds->hms t)))
-		 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
-		 (when (= (caddr hms) 59)
-		   (printf "\033]0;~a ~am\007\007~!" (if state *sit* *stand*) (cadr hms))))
-		 (loop (- timer *interval*) state paused colors))
+				  ((< (- timer t) *interval*))
+				  (hms (seconds->hms t)))
+				 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
+				 (print* (xterm-title
+						   (string-join
+							 (list (if state *sit* *stand*)
+								   (if (zero? (car hms))
+									 (conc (cadr hms) "m")
+									 (conc (car hms) "h" (cadr hms) "m")))
+							 " "))))
+	   (loop (- timer *interval*) state paused colors))
 
 	  ;otherwise, decrement timer
 	  (else (loop (- timer *interval*) state paused colors)))))
