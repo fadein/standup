@@ -313,9 +313,9 @@ POMO
 	  (exit 1))
 
 	(when (assoc 'standup-time opts)
-	  (set! *stand-time* (* 60 (string->number (cdr (assoc 'standup-time opts))))))
+	  (set! *stand-time* (minutes (string->number (cdr (assoc 'standup-time opts))))))
 	(when (assoc 'sitdown-time opts)
-	  (set! *sit-time* (* 60 (string->number (cdr (assoc 'sitdown-time opts))))))))
+	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))))
 
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
