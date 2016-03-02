@@ -15,3 +15,8 @@ Usage:
 
 	Spacebar pauses the timer, Z, z or 0 zeroes the timer & triggers
 	a state change between standing & sitting.
+
+TODO:
+	* Optionally right-justify text in terminal window (for viewing in terminal
+	  on bottom-right side of screen)
+	* Overtime counter which counts up after time has expired
