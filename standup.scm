@@ -89,15 +89,12 @@
 	   (let ((char (read-char)))
 		 (case char
 		   ((#\space) ;pause/resume on SPACE
-			(cond
-			  (paused
-				(erase-line)
-				(bell&title (set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r")))
-				(loop (- timer *interval*) state (not paused) colors))
-			  (else
-				(erase-line)
-				(bell&title (set-text (list (car colors)) "[PAUSED]\r"))
-				(loop (- timer *interval*) state (not paused) colors))))
+			(erase-line)
+			(bell&title
+			  (if paused
+				(set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r"))
+				(set-text (list (car colors)) "[PAUSED]\r")))
+			(loop (- timer *interval*) state (not paused) colors))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
 			(loop 0 state paused colors))
