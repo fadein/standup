@@ -101,6 +101,12 @@
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
 			(loop 0 state paused colors))
 
+		   ((#\+) ; add a minute to a running timer
+			(loop (if paused timer (+ timer 60)) state paused colors))
+
+		   ((#\-) ; subtract a minute from the timer
+			(loop (if paused timer (- timer 60)) state paused colors))
+
 		   ((#\R #\r) ;reset the timer on R or r
 			(loop
 			  (if state *sit-time* *stand-time*)
