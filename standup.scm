@@ -63,15 +63,10 @@
 
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
-  (let
-	((hours_s (string-pad (number->string (car   hms)) 2 #\0))
-	 (minut_s (string-pad (number->string (cadr  hms)) 2 #\0))
-	 (secon_s (string-pad (number->string (caddr hms)) 2 #\0)))
-	(if (zero? (car hms))
-	  (sprintf "~a:~a"            minut_s secon_s)
-	  (sprintf "~a:~a:~a" hours_s minut_s secon_s))))
+  (string-join (map (lambda (s) (string-pad (number->string s) 2 #\0))
+					(if (zero? (car hms)) (cdr hms) hms)) ":"))
 
-;; what I need instead is a function which can split time into the components
+;; convert seconds of time into h:m:s integer components
 (define (seconds->hms s)
   (let ((hours   (inexact->exact (truncate (/ s 60 60))))
 		(minutes (inexact->exact (remainder (truncate (/ s 60)) 60)))
