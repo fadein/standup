@@ -44,20 +44,24 @@
 					 (substring str (add1 first) end))
 				   str)))
 
-;; ring the terminal bell, update the XTerm title, and update the bottom line of the terminal's text
-;; this function is doing too much
+
+(define (bell) "\007")
+(define xterm-title #f)
+(let ((TERM (get-environment-variable "TERM")))
+  (set! xterm-title
+	(lambda (str)
+	  (regex-case (get-environment-variable "TERM")
+				  ("screen.*|xterm.*|rxvt.*" _
+				   (conc "\033]0;" str (bell)))
+				  (else
+					"")))))
+
+;; ring the terminal bell, update the XTerm title,
+;; and update the bottom line of the terminal's text
 (define (bell&title str)
-  (regex-case (get-environment-variable "TERM")
-			  ("screen.*|xterm.*|rxvt.*" _
-			   (erase-line)
-			   ; http://www.tldp.org/HOWTO/Xterm-Title-3.html#ss3.1
-			   ; ~! tells CHICKEN's printf function to flush its output
-			   (printf "~a\033]0;~a\007\007~!" str (strip-ansi-colors str) ))
-			  (else
-				(print "TERM=" (get-environment-variable "TERM")))))
+  (print* str (xterm-title (strip-ansi-colors str)) (bell)))
 
-
-;; pretty-print '(hours minutes seconds)  into hours:minutes:seconds
+;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
   (let
 	((hours_s (string-pad (number->string (car   hms)) 2 #\0))
