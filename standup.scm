@@ -16,6 +16,28 @@
 (set-signal-handler! signal/pipe  cleanup)
 (set-signal-handler! signal/quit  cleanup)
 
+; get dimensions of the screen
+(define *COLUMNS* #f)
+(define *LINES*   #f)
+(define (get-screen-dimensions _)
+  (let ((cols
+		  (let-values (((in out pid) (process "tput cols")))
+					  (let ((cols (read-line in)))
+						(close-input-port in)
+						(close-output-port out)
+						cols)))
+		(lines
+		  (let-values (((in out pid) (process "tput lines")))
+					  (let ((lines (read-line in)))
+						(close-input-port in)
+						(close-output-port out)
+						lines))))
+	(print "get-screen-dimensions():" cols "x" lines)
+	(set! *COLUMNS* (if (not (equal? cols  "")) (string->number cols  ) 80))
+	(set! *LINES*   (if (not (equal? lines "")) (string->number lines ) 24))))
+(set-signal-handler! signal/winch get-screen-dimensions)
+
+
 (define-syntax seconds
   (syntax-rules ()
 	((_ n)
@@ -321,6 +343,8 @@ POMO
 	(when (assoc 'sitdown-time opts)
 	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))))
 
+(get-screen-dimensions #f)
+(print *COLUMNS* "x" *LINES*)
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
 (print (show-cursor))
