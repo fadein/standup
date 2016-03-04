@@ -46,20 +46,11 @@
 
 
 (define (bell) "\007")
-(define xterm-title #f)
-(let ((TERM (get-environment-variable "TERM")))
-  (set! xterm-title
-	(lambda (str)
-	  (regex-case (get-environment-variable "TERM")
-				  ("screen.*|xterm.*|rxvt.*" _
-				   (conc "\033]0;" str (bell)))
-				  (else
-					"")))))
 
 ;; ring the terminal bell, update the XTerm title,
 ;; and update the bottom line of the terminal's text
 (define (bell&title str)
-  (print* str (xterm-title (strip-ansi-colors str)) (bell)))
+  (print* str (set-title (strip-ansi-colors str)) (bell)))
 
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
@@ -160,7 +151,7 @@
 				  ((< (- timer t) *interval*))
 				  (hms (seconds->hms t)))
 				 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
-				 (print* (xterm-title
+				 (print* (set-title
 						   (string-join
 							 (list (if state *sit* *stand*)
 								   (if (zero? (car hms))
