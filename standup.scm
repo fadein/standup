@@ -29,7 +29,6 @@
 												  ret))))))
   (let ((cols (tput "cols"))
 		(lines (tput "lines")))
-	(print "get-screen-dimensions():" cols "x" lines)
 	(set! *COLUMNS* (if (not (equal? cols  "")) (string->number cols  ) 80))
 	(set! *LINES*   (if (not (equal? lines "")) (string->number lines ) 24)))))
 (set-signal-handler! signal/winch get-screen-dimensions)
@@ -51,6 +50,8 @@
 
 (define *stand*      "stand up!")
 (define *sit*        "sit down")
+
+(define *right-justify* #f)
 
 ; How to tell that we're at the end of the circular list
 (define *last-color* 'fg-red)
@@ -317,6 +318,9 @@ POMO
 			,(conc "Number of minutes for the sitdown interval (default " (/ *sit-time* 60) ")")
 			(value #t)
 			(single-char #\d))
+		  (right-justify
+			,(conc "Right-justify text output (default " *right-justify* ")")
+			(single-char #\r))
 		  (help
 			"This usage message"
 			(single-char #\h)))))
@@ -338,10 +342,11 @@ POMO
 	(when (assoc 'standup-time opts)
 	  (set! *stand-time* (minutes (string->number (cdr (assoc 'standup-time opts))))))
 	(when (assoc 'sitdown-time opts)
-	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))))
+	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))
+	(when (assoc 'right-justify opts)
+	  (set! *right-justify* #t))))
 
 (get-screen-dimensions #f)
-(print *COLUMNS* "x" *LINES*)
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
 (print (show-cursor))
