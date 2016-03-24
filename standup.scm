@@ -40,7 +40,6 @@
 (define *cols*)
 
 (define (window-size-changed! signal)
-  (print "window-size-changed!") ; DELETE ME
   (let ((rows.cols (ioctl-winsize)))
 	(set! *rows* (car rows.cols))
 	(set! *cols* (cadr rows.cols))))
@@ -73,6 +72,22 @@
 (define (bell&title&print str attrs)
   (print* (bell) (xterm-title str) (set-text attrs (if *right-justify* (string-pad str *cols*) str))))
 
+;; simplify miscellaneous output
+(define-syntax fancyprint
+  (syntax-rules (no-newline)
+				((_)
+				 (error "You must provide at least an  attribute for set-text"))
+
+				((_ attr)
+				 (let ((text "Press [space] to continue..."))
+				   (print (set-text attr (if *right-justify* (string-pad text *cols*) text)))))
+
+				((_ no-newline attr text)
+				 (print* (set-text attr (if *right-justify* (string-pad text *cols*) text))))
+
+				((_ attr text)
+				 (print (set-text attr (if *right-justify* (string-pad text *cols*) text))))))
+
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
   (string-join (map (lambda (s) (string-pad (number->string s) 2 #\0))
@@ -84,19 +99,6 @@
 		(minutes (inexact->exact (remainder (truncate (/ s 60)) 60)))
 		(seconds (inexact->exact (remainder s 60))))
 	(list hours minutes seconds)))
-
-
-(define-syntax fancyprint
-  (syntax-rules ()
-				((_)
-				 (error "You must provide at least an  attribute for set-text"))
-				((_ attr)
-				 (let ((text "Press [space] to continue..."))
-				   (print (set-text attr
-									(if *right-justify* (string-pad text *cols*) text)))))
-				((_ attr text)
-				 (print (set-text attr (if *right-justify* (string-pad text *cols*) text))))))
-
 
 (define (sitdown)
   (bell&title&print *sit* '(bold fg-blue))
@@ -185,8 +187,8 @@
 	  ((and-let* ((t (truncate timer))
 				  ((< (- timer t) *interval*))
 				  (hms (seconds->hms t)))
-				 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
-				 (print* (xterm-title
+				 (fancyprint no-newline `(bold ,(car colors)) (conc (prettySeconds hms) "..."))
+				 (print* "\r" (xterm-title
 						   (string-join
 							 (list (if state *sit* *stand*)
 								   (if (zero? (car hms))
@@ -325,7 +327,10 @@ POMO
 	(car texts))))
 
 (let ((grammar
-		`((standup-time
+		`((help
+			"This usage message"
+			(single-char #\h))
+		  (standup-time
 			,(conc "Number of minutes for the standup interval (default " (/ *stand-time* 60) ")")
 			(value #t)
 			(single-char #\u))
@@ -333,11 +338,8 @@ POMO
 			,(conc "Number of minutes for the sitdown interval (default " (/ *sit-time* 60) ")")
 			(value #t)
 			(single-char #\d))
-		  (help
-			"This usage message"
-			(single-char #\h))
 		  (right-justify
-			,(conc "Right-justify text (default #f)")
+			,(conc "Right-justify text                         (default #f)")
 			(value #f)
 			(single-char #\r)))))
 
