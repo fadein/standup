@@ -91,9 +91,11 @@
 				((_)
 				 (error "You must provide at least an  attribute for set-text"))
 				((_ attr)
-				 (print (set-text attr  "Press [space] to continue...")))
+				 (let ((text "Press [space] to continue..."))
+				   (print (set-text attr
+									(if *right-justify* (string-pad text *cols*) text)))))
 				((_ attr text)
-				 (print (set-text attr text)))))
+				 (print (set-text attr (if *right-justify* (string-pad text *cols*) text))))))
 
 
 (define (sitdown)
