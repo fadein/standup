@@ -58,8 +58,8 @@
 
 ;; ring the terminal bell, update the XTerm title,
 ;; and update the bottom line of the terminal's text
-(define (bell&title str)
-  (print* str (xterm-title (strip-ansi-colors str)) (bell)))
+(define (bell&title&print str attrs)
+  (print* (bell) (xterm-title str) (set-text attrs str)))
 
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
@@ -74,7 +74,7 @@
 	(list hours minutes seconds)))
 
 (define (sitdown)
-  (bell&title (set-text '(bold fg-blue) *sit*))
+  (bell&title&print *sit* '(bold fg-blue))
   (newline)
 
   ;state = #t means "sit"
@@ -92,10 +92,9 @@
 		 (case char
 		   ((#\space) ;pause/resume on SPACE
 			(erase-line)
-			(bell&title
 			  (if paused
-				(set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r"))
-				(set-text (list (car colors)) "[PAUSED]\r")))
+				(bell&title&print (conc (if state *sit* *stand*) "\r") `(bold ,(car colors)))
+				(bell&title&print "[PAUSED]\r" (list (car colors))))
 			(loop (- timer *interval*) state (not paused) colors))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
@@ -135,7 +134,7 @@
 
 	  ;transition from sitting to STANDING
 	  ((and (<= timer 0) state)
-	   (bell&title (set-text `(bold ,(car colors)) (conc *stand* "\r")))
+	   (bell&title&print (conc *stand* "\r") `(bold ,(car colors)))
 	   (newline)
 	   (cond
 		 ;; when we're at the end of our list of colors, the cycle is almost complete.
@@ -150,7 +149,7 @@
 
 	  ;transition from STANDING to sitting
 	  ((and (<= timer 0) (not state))
-	   (bell&title (set-text `(bold ,(cadr colors)) (conc *sit* "\r")))
+	   (bell&title&print (conc *sit* "\r") `(bold ,(cadr colors)))
 	   (newline)
 	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
 	   (loop *sit-time* #t #t (cdr colors)))
