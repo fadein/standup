@@ -2,6 +2,7 @@
 
 (use ansi-escape-sequences
 	 getopt-long
+	 ioctl
 	 regex-case
 	 srfi-1
 	 srfi-13
@@ -33,6 +34,17 @@
 (define *stand*      "stand up!")
 (define *sit*        "sit down")
 
+; Dimensions of the terminal, and whether we should care
+(define *right-justify* #f)
+(define *rows*)
+(define *cols*)
+
+(define (window-size-changed! signal)
+  (print "window-size-changed!") ; DELETE ME
+  (let ((rows.cols (ioctl-winsize)))
+	(set! *rows* (car rows.cols))
+	(set! *cols* (cadr rows.cols))))
+
 ; How to tell that we're at the end of the circular list
 (define *last-color* 'fg-red)
 
@@ -59,7 +71,7 @@
 ;; ring the terminal bell, update the XTerm title,
 ;; and update the bottom line of the terminal's text
 (define (bell&title&print str attrs)
-  (print* (bell) (xterm-title str) (set-text attrs str)))
+  (print* (bell) (xterm-title str) (set-text attrs (if *right-justify* (string-pad str *cols*) str))))
 
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
@@ -72,6 +84,17 @@
 		(minutes (inexact->exact (remainder (truncate (/ s 60)) 60)))
 		(seconds (inexact->exact (remainder s 60))))
 	(list hours minutes seconds)))
+
+
+(define-syntax fancyprint
+  (syntax-rules ()
+				((_)
+				 (error "You must provide at least an  attribute for set-text"))
+				((_ attr)
+				 (print (set-text attr  "Press [space] to continue...")))
+				((_ attr text)
+				 (print (set-text attr text)))))
+
 
 (define (sitdown)
   (bell&title&print *sit* '(bold fg-blue))
@@ -93,8 +116,9 @@
 		   ((#\space) ;pause/resume on SPACE
 			(erase-line)
 			  (if paused
-				(bell&title&print (conc (if state *sit* *stand*) "\r") `(bold ,(car colors)))
-				(bell&title&print "[PAUSED]\r" (list (car colors))))
+				(bell&title&print (if state *sit* *stand*) `(bold ,(car colors)))
+				(bell&title&print "[PAUSED]" (list (car colors))))
+			  (print* "\r")
 			(loop (- timer *interval*) state (not paused) colors))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
@@ -134,24 +158,25 @@
 
 	  ;transition from sitting to STANDING
 	  ((and (<= timer 0) state)
-	   (bell&title&print (conc *stand* "\r") `(bold ,(car colors)))
-	   (newline)
+	   (bell&title&print *stand* `(bold ,(car colors)))
+	   (print* "\r\n")
 	   (cond
 		 ;; when we're at the end of our list of colors, the cycle is almost complete.
 		 ;; it's time for a big pomodoro break!!!
 		 ((eq? (car colors) *last-color*)
 		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
-		  (print (set-text (list (car colors)) "\nPress [space] to continue..."))
+		  (newline)
+		  (fancyprint `(,(car colors)))
 		  (loop *sit-time* #f #t colors))
 		 (else
-		   (print (set-text (list (car colors)) "Press [space] to continue..."))
+		   (fancyprint `(,(car colors)))
 		   (loop *stand-time* #f #t colors))))
 
 	  ;transition from STANDING to sitting
 	  ((and (<= timer 0) (not state))
-	   (bell&title&print (conc *sit* "\r") `(bold ,(cadr colors)))
-	   (newline)
-	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
+	   (bell&title&print *sit* `(bold ,(cadr colors)))
+	   (print* "\r\n")
+	   (fancyprint `(,(cadr colors)))
 	   (loop *sit-time* #t #t (cdr colors)))
 
 	  ;update time display once per second
@@ -308,7 +333,11 @@ POMO
 			(single-char #\d))
 		  (help
 			"This usage message"
-			(single-char #\h)))))
+			(single-char #\h))
+		  (right-justify
+			,(conc "Right-justify text (default #f)")
+			(value #f)
+			(single-char #\r)))))
 
   (let ((opts (getopt-long (command-line-arguments) grammar
 						   unknown-option-handler:
@@ -327,7 +356,11 @@ POMO
 	(when (assoc 'standup-time opts)
 	  (set! *stand-time* (minutes (string->number (cdr (assoc 'standup-time opts))))))
 	(when (assoc 'sitdown-time opts)
-	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))))
+	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))
+	(when (assoc 'right-justify opts)
+	  (set! *right-justify* #t)
+	  (window-size-changed! #f)
+	  (set-signal-handler! signal/winch window-size-changed!))))
 
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
