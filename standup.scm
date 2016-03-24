@@ -2,6 +2,7 @@
 
 (use ansi-escape-sequences
 	 getopt-long
+	 ioctl
 	 regex-case
 	 srfi-1
 	 srfi-13
@@ -15,24 +16,6 @@
 (set-signal-handler! signal/int   cleanup)
 (set-signal-handler! signal/pipe  cleanup)
 (set-signal-handler! signal/quit  cleanup)
-
-; get dimensions of the screen
-(define *COLUMNS* #f)
-(define *LINES*   #f)
-(define (get-screen-dimensions _)
-  (let-syntax ((tput (syntax-rules ()
-								   ((tput cmd)
-									(let-values (((in out pid) (process (conc "tput " cmd))))
-												(let ((ret (read-line in)))
-												  (close-input-port in)
-												  (close-output-port out)
-												  ret))))))
-  (let ((cols (tput "cols"))
-		(lines (tput "lines")))
-	(set! *COLUMNS* (if (not (equal? cols  "")) (string->number cols  ) 80))
-	(set! *LINES*   (if (not (equal? lines "")) (string->number lines ) 24)))))
-(set-signal-handler! signal/winch get-screen-dimensions)
-
 
 (define-syntax seconds
   (syntax-rules ()
@@ -51,7 +34,15 @@
 (define *stand*      "stand up!")
 (define *sit*        "sit down")
 
+; Dimensions of the terminal, and whether we should care
 (define *right-justify* #f)
+(define *rows*)
+(define *cols*)
+
+(define (window-size-changed! signal)
+  (let ((rows.cols (ioctl-winsize)))
+	(set! *rows* (car rows.cols))
+	(set! *cols* (cadr rows.cols))))
 
 ; How to tell that we're at the end of the circular list
 (define *last-color* 'fg-red)
@@ -69,8 +60,24 @@
 
 ;; ring the terminal bell, update the XTerm title,
 ;; and update the bottom line of the terminal's text
-(define (bell&title str)
-  (print* str (set-title (strip-ansi-colors str)) (bell)))
+(define (bell&title&print str attrs)
+  (print* (bell) (set-title str) (set-text attrs (if *right-justify* (string-pad str *cols*) str))))
+
+;; simplify miscellaneous output
+(define-syntax fancyprint
+  (syntax-rules (no-newline)
+				((_)
+				 (error "You must provide at least an  attribute for set-text"))
+
+				((_ attr)
+				 (let ((text "Press [space] to continue..."))
+				   (print (set-text attr (if *right-justify* (string-pad text *cols*) text)))))
+
+				((_ no-newline attr text)
+				 (print* (set-text attr (if *right-justify* (string-pad text *cols*) text))))
+
+				((_ attr text)
+				 (print (set-text attr (if *right-justify* (string-pad text *cols*) text))))))
 
 ;; pretty-print '(hours minutes seconds) into hours:minutes:seconds
 (define (prettySeconds hms)
@@ -85,7 +92,7 @@
 	(list hours minutes seconds)))
 
 (define (sitdown)
-  (bell&title (set-text '(bold fg-blue) *sit*))
+  (bell&title&print *sit* '(bold fg-blue))
   (newline)
 
   ;state = #t means "sit"
@@ -103,10 +110,10 @@
 		 (case char
 		   ((#\space) ;pause/resume on SPACE
 			(erase-line)
-			(bell&title
 			  (if paused
-				(set-text `(bold ,(car colors)) (conc (if state *sit* *stand*) "\r"))
-				(set-text (list (car colors)) "[PAUSED]\r")))
+				(bell&title&print (if state *sit* *stand*) `(bold ,(car colors)))
+				(bell&title&print "[PAUSED]" (list (car colors))))
+			  (print* "\r")
 			(loop (- timer *interval*) state (not paused) colors))
 
 		   ((#\0 #\Z #\z) ;zero the timer on 0, Z, or z
@@ -146,32 +153,33 @@
 
 	  ;transition from sitting to STANDING
 	  ((and (<= timer 0) state)
-	   (bell&title (set-text `(bold ,(car colors)) (conc *stand* "\r")))
-	   (newline)
+	   (bell&title&print *stand* `(bold ,(car colors)))
+	   (print* "\r\n")
 	   (cond
 		 ;; when we're at the end of our list of colors, the cycle is almost complete.
 		 ;; it's time for a big pomodoro break!!!
 		 ((eq? (car colors) *last-color*)
 		  (print (set-text `(bold ,(car colors)) (a-pomodoro)))
-		  (print (set-text (list (car colors)) "\nPress [space] to continue..."))
+		  (newline)
+		  (fancyprint `(,(car colors)))
 		  (loop *sit-time* #f #t colors))
 		 (else
-		   (print (set-text (list (car colors)) "Press [space] to continue..."))
+		   (fancyprint `(,(car colors)))
 		   (loop *stand-time* #f #t colors))))
 
 	  ;transition from STANDING to sitting
 	  ((and (<= timer 0) (not state))
-	   (bell&title (set-text `(bold ,(cadr colors)) (conc *sit* "\r")))
-	   (newline)
-	   (print (set-text (list (cadr colors)) "Press [space] to continue..."))
+	   (bell&title&print *sit* `(bold ,(cadr colors)))
+	   (print* "\r\n")
+	   (fancyprint `(,(cadr colors)))
 	   (loop *sit-time* #t #t (cdr colors)))
 
 	  ;update time display once per second
 	  ((and-let* ((t (truncate timer))
 				  ((< (- timer t) *interval*))
 				  (hms (seconds->hms t)))
-				 (printf "~a...           \r~!" (set-text `(bold ,(car colors)) (prettySeconds hms)))
-				 (print* (set-title
+				 (fancyprint no-newline `(bold ,(car colors)) (conc (prettySeconds hms) "..."))
+				 (print* "\r" (set-title
 						   (string-join
 							 (list (if state *sit* *stand*)
 								   (if (zero? (car hms))
@@ -310,7 +318,10 @@ POMO
 	(car texts))))
 
 (let ((grammar
-		`((standup-time
+		`((help
+			"This usage message"
+			(single-char #\h))
+		  (standup-time
 			,(conc "Number of minutes for the standup interval (default " (/ *stand-time* 60) ")")
 			(value #t)
 			(single-char #\u))
@@ -319,11 +330,9 @@ POMO
 			(value #t)
 			(single-char #\d))
 		  (right-justify
-			,(conc "Right-justify text output (default " *right-justify* ")")
-			(single-char #\r))
-		  (help
-			"This usage message"
-			(single-char #\h)))))
+			,(conc "Right-justify text                         (default #f)")
+			(value #f)
+			(single-char #\r)))))
 
   (let ((opts (getopt-long (command-line-arguments) grammar
 						   unknown-option-handler:
@@ -344,9 +353,10 @@ POMO
 	(when (assoc 'sitdown-time opts)
 	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))
 	(when (assoc 'right-justify opts)
-	  (set! *right-justify* #t))))
+	  (set! *right-justify* #t)
+	  (window-size-changed! #f)
+	  (set-signal-handler! signal/winch window-size-changed!))))
 
-(get-screen-dimensions #f)
 (print* (hide-cursor))
 (with-stty '(not icanon echo) sitdown)
 (print (show-cursor))
