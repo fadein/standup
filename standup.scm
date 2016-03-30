@@ -2,7 +2,7 @@
 
 (use ansi-escape-sequences
 	 getopt-long
-	 ioctl
+	 posix
 	 regex-case
 	 srfi-1
 	 srfi-13
@@ -40,9 +40,9 @@
 (define *cols*)
 
 (define (window-size-changed! signal)
-  (let ((rows.cols (ioctl-winsize)))
-	(set! *rows* (car rows.cols))
-	(set! *cols* (cadr rows.cols))))
+  (let-values (((rows cols) (terminal-size (current-output-port))))
+	(set! *rows* rows)
+	(set! *cols* cols)))
 
 ; How to tell that we're at the end of the circular list
 (define *last-color* 'fg-red)
