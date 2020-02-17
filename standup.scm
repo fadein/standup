@@ -1,8 +1,13 @@
 #!/usr/bin/csi -ns
 
-(use ansi-escape-sequences
+(import ansi-escape-sequences
 	 getopt-long
-	 posix
+	 (chicken time posix)
+     (chicken process signal)
+     (chicken process-context)
+     (chicken port)
+     (chicken random)
+     (chicken string)
 	 regex-case
 	 srfi-1
 	 srfi-13
@@ -197,7 +202,7 @@
   (let* ((vector-shuffle
 		   (lambda (v)
 			 (do ((n (vector-length v) (- n 1))) ((zero? n) v)
-			   (let* ((r (random n)) (t (vector-ref v r)))
+			   (let* ((r (pseudo-random-integer n)) (t (vector-ref v r)))
 				 (vector-set! v r (vector-ref v (- n 1)))
 				 (vector-set! v (- n 1) t)))))
 		 (texts
