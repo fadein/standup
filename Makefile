@@ -1,10 +1,24 @@
-.PHONY: clean install-eggs
+CSC          ?= csc
+CSC_OPTIONS  ?= -static
+CHICKEN-INST ?= chicken-install
+INSTALL      ?= install
+RM           ?= rm
+RMDIR        ?= rmdir
+SUDO         ?= sudo
+BINDIR       ?= /usr/local/bin
 
 standup: standup.scm
-	csc $^
+	$(CSC) $(CSC_OPTIONS) $^
 
 clean:
-	rm -f standup *.o
+	-$(RM) -f standup *.o
 
 install-eggs:
-	chicken-install -s getopt-long regex-case stty srfi-1 srfi-13 srfi-18
+	$(CHICKEN-INST) -s ansi-escape-sequences getopt-long regex-case srfi-1 srfi-13 srfi-18 stty
+
+install: standup
+	$(SUDO) $(INSTALL) -d -m 775 $(BINDIR)
+	$(SUDO) $(INSTALL) -p -m 755 -t $(BINDIR) $^
+
+
+.PHONY: clean install-eggs install
