@@ -1,18 +1,20 @@
 #!/usr/bin/csi -ns
 
-(import ansi-escape-sequences
-	 getopt-long
-	 (chicken time posix)
-     (chicken process signal)
-     (chicken process-context)
-     (chicken port)
-     (chicken random)
-     (chicken string)
-	 regex-case
-	 srfi-1
-	 srfi-13
-	 srfi-18
-	 stty)
+(import
+  (chicken port)
+  (chicken process signal)
+  (chicken process-context)
+  (chicken random)
+  (chicken string)
+  (chicken time posix)
+  ansi-escape-sequences
+  getopt-long
+  regex-case
+  srfi-1
+  srfi-13
+  srfi-18
+  stty)
+
 
 (define (cleanup signal)
   (print (show-cursor) (set-text '(fg-white) ""))
