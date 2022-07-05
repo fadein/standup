@@ -16,6 +16,8 @@
   stty)
 
 
+(define *VERSION* "1.0")
+
 (define (cleanup signal)
   (print (show-cursor) (set-text '(fg-white) ""))
   (exit))
@@ -74,7 +76,7 @@
 (define-syntax fancyprint
   (syntax-rules (no-newline)
 				((_)
-				 (error "You must provide at least an  attribute for set-text"))
+				 (error "You must provide at least an attribute for set-text"))
 
 				((_ attr)
 				 (let ((text "Press [space] to continue..."))
@@ -97,6 +99,14 @@
 		(minutes (inexact->exact (remainder (truncate (/ s 60)) 60)))
 		(seconds (inexact->exact (remainder s 60))))
 	(list hours minutes seconds)))
+
+;; return a length three string of dots and spaces
+(define (dots s)
+  (case (remainder (inexact->exact s) 4)
+    ((0) "   ")
+    ((1) ".  ")
+    ((2) ".. ")
+    ((3) "...")))
 
 (define (sitdown)
   (bell&title&print *sit* '(bold fg-blue))
@@ -142,11 +152,13 @@
 
 		   ((#\H #\h #\?) ;help
 			(erase-line)
-			(print (string-join '("Pomodoro timer usage:"
+			(print (string-join `(,(conc "Pomodoro timer v" *VERSION* " interactive commands:")
 								  "\tH,h,?\tThis usage message"
 								  "\tSPACE\tPause/Resume"
 								  "\t0,Z,z\tZero the timer"
 								  "\tR,r\tReset timer"
+								  "\t+\tAdd 1 minute"
+								  "\t-\tSubtract 1 minute"
 								  "\tQ,q\tQuit")
 								"\n"))
 			(loop (- timer *interval*) state paused colors))
@@ -185,7 +197,7 @@
 	  ((and-let* ((t (truncate timer))
 				  ((< (- timer t) *interval*))
 				  (hms (seconds->hms t)))
-				 (fancyprint no-newline `(bold ,(car colors)) (conc (prettySeconds hms) "..."))
+				 (fancyprint no-newline `(bold ,(car colors)) (conc (prettySeconds hms) (dots t)))
 				 (print* "\r" (set-title
 						   (string-join
 							 (list (if state *sit* *stand*)
@@ -324,48 +336,51 @@ POMO
   (set! texts (cdr texts))
 	(car texts))))
 
-(let ((grammar
-		`((help
-			"This usage message"
-			(single-char #\h))
-		  (sitdown-time
-			,(conc "Number of minutes for the sitdown interval (default " (/ *sit-time* 60) ")")
-			(value #t)
-			(single-char #\d))
-		  (standup-time
-			,(conc "Number of minutes for the standup interval (default " (/ *stand-time* 60) ")")
-			(value #t)
-			(single-char #\u))
-		  (right-justify
-			,(conc "Right-justify text                         (default #f)")
-			(value #f)
-			(single-char #\r)))))
+(cond-expand
+  (compiling
+    (let ((grammar
+            `((help
+                "This usage message"
+                (single-char #\h))
+              (sitdown-time
+                ,(conc "Number of minutes for the sitdown interval (default " (/ *sit-time* 60) ")")
+                (value #t)
+                (single-char #\d))
+              (standup-time
+                ,(conc "Number of minutes for the standup interval (default " (/ *stand-time* 60) ")")
+                (value #t)
+                (single-char #\u))
+              (right-justify
+                ,(conc "Right-justify text                         (default #f)")
+                (value #f)
+                (single-char #\r)))))
 
-  (let ((opts (getopt-long (command-line-arguments) grammar
-						   unknown-option-handler:
-						   (lambda (l)
-							 (printf "Unrecognized argument~a ~a~n"
-									 (if (= 1 (length l)) "" "s")
-									 l)
-							 (print (usage grammar))
-							 (exit 7)))))
+      (let ((opts (getopt-long (command-line-arguments) grammar
+                               unknown-option-handler:
+                               (lambda (l)
+                                 (printf "Unrecognized argument~a ~a~n"
+                                         (if (= 1 (length l)) "" "s")
+                                         l)
+                                 (print (usage grammar))
+                                 (exit 7)))))
 
-	(when (assoc 'help opts)
-	  (print "standup usage:")
-	  (print (usage grammar))
-	  (exit 1))
+        (when (assoc 'help opts)
+          (print "standup v" *VERSION* " usage:")
+          (print (usage grammar))
+          (exit 1))
 
-	(when (assoc 'standup-time opts)
-	  (set! *stand-time* (minutes (string->number (cdr (assoc 'standup-time opts))))))
-	(when (assoc 'sitdown-time opts)
-	  (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))
-	(when (assoc 'right-justify opts)
-	  (set! *right-justify* #t)
-	  (window-size-changed! #f)
-	  (set-signal-handler! signal/winch window-size-changed!))))
+        (when (assoc 'standup-time opts)
+          (set! *stand-time* (minutes (string->number (cdr (assoc 'standup-time opts))))))
+        (when (assoc 'sitdown-time opts)
+          (set! *sit-time* (minutes (string->number (cdr (assoc 'sitdown-time opts))))))
+        (when (assoc 'right-justify opts)
+          (set! *right-justify* #t)
+          (window-size-changed! #f)
+          (set-signal-handler! signal/winch window-size-changed!))))
 
-(print* (hide-cursor))
-(with-stty '(not icanon echo) sitdown)
-(print (show-cursor))
+    (print* (hide-cursor))
+    (with-stty '(not icanon echo) sitdown)
+    (print (show-cursor)))
+  (else #f))
 
 ; vim:set ft=scheme:
